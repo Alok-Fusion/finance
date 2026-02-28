@@ -1,0 +1,18 @@
+# Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# IDE
+.idea/
+.vscode/
+
+# Datasets & Pipeline Outputs
+phase*.csv
+data/*.csv
+*.log
+
+# Checkpoints
+.ipynb_checkpoints/

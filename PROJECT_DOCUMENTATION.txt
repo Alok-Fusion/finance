@@ -1,0 +1,111 @@
+================================================================================
+FINANCIAL NETWORK ASYMMETRY PROJECT: DETAILED TECHNICAL DOCUMENTATION
+================================================================================
+
+1. EXECUTIVE OVERVIEW & BUSINESS PURPOSE
+========================================
+This project provides a complete data science pipeline to model and evaluate systemic risk across financial markets using graph theory (networks). Rather than analyzing stocks in isolation, the project treats the stock market as a dynamic web of interconnected entities.
+
+Business Value:
+- Risk Managers: Identify hidden vulnerabilities where negative market shocks are mathematically amplified across interconnected sectors.
+- Portfolio Managers: Discover "stabilizer" stocks that absorb volatility, improving portfolio diversification during market stress.
+- Quantitative Analysts: Move beyond static covariance matrices to dynamic, signed network exposure metrics.
+
+2. SYSTEM ARCHITECTURE
+======================
+The system is built as a modular, 5-phase sequential data processing pipeline. It utilizes Pandas for time-series panel data manipulation, NetworkX for graph construction, and the Louvain heuristic for unsupervised community detection.
+
+Key Architectural Components:
+- Data Ingestion Layer: Parses `.csv` panel data of distinct equities over time.
+- Statistical Engine: Computes continuous logarithmic returns and rolling volatility distributions.
+- Graph Engine: Builds daily Adjacency Matrices mapping weighted Pearson correlations between N nodes (equities).
+- Scoring Engine: Evaluates node-level asymmetric behavior by blending topological exposure with realized volatility.
+- Aggregation Layer: Rolls up firm-level embeddings to sector-level and community-level macro insights.
+
+3. PROCESS FLOWCHART
+====================
++-----------------------+      +-----------------------+      +-----------------------+
+|  RAW MARKET DATA      |      | PHASE 1: PRE-PROCESS  |      | PHASE 2: GRAPH BUID   |
+| (stocks_df.csv)       | ---> | - Log Returns         | ---> | - 60-Day Rolling Corr.|
+| (nse_indexes.csv)     |      | - 20-Day Volatility   |      | - Filter Edges (>=0.3)|
++-----------------------+      | - Detect 5% Shocks    |      | - Generate Networks   |
+                               +-----------------------+      +-----------------------+
+                                                                         |
+                                                                         v
++-----------------------+      +-----------------------+      +-----------------------+
+| PHASE 5: COMMUNITIES  |      | PHASE 4: ASYMMETRY    |      | PHASE 3: SPILLOVER    |
+| - Louvain Algorithm   | <--- | - Signed Exposure     | <--- | - Sum Abs Edge Weights|
+| - Sector Mapping      |      | - Impact Scoring      |      | - Compare Normal vs.  |
+| - Macro Vulnerability |      | - Rank Amplifiers     |      |   Shock Regimes       |
++-----------------------+      +-----------------------+      +-----------------------+
+           |
+           v
++-----------------------+
+| REPORTING & DOWNSTREAM|
+| - GNN Feature Matrices|
+| - Risk Dashboards     |
++-----------------------+
+
+4. METHODOLOGICAL PIPELINE
+==========================
+--------------------------------------------------
+PHASE 1: DATA INGESTION & SHOCK DETECTION
+Script: phase1_data_processing.py
+Process:
+1. Returns Calculation: Computes daily logarithmic returns: return_t = ln(close_t) - ln(close_t-1)
+2. Volatility Modeling: Calculates a rolling 20-day standard deviation of log returns.
+3. Shock Labeling: Identifies statistical extremes in the volatility distribution for each stock individually.
+   - Positive Shock (1): Volatility >= 95th percentile.
+   - Negative Shock (-1): Volatility <= 5th percentile.
+
+--------------------------------------------------
+PHASE 2: DYNAMIC NETWORK CONSTRUCTION
+Scripts: phase2_build_network.py
+Process:
+1. Rolling Correlation: Sliding a 60-day window computing the Pearson correlation matrix, minimum 50 overlapping observations.
+2. Edge Filtering: Forms a connection only if absolute correlation >= 0.3. Generates daily sparse graph snapshots.
+
+--------------------------------------------------
+PHASE 3: BASELINE RISK PROPAGATION
+Script: phase3_risk_propagation_baseline.py
+Process:
+1. Network Exposure: Computes degree of exposure summing absolute weights.
+2. Benchmarking: Compares total network spillover between "Normal" and "Shock" states.
+
+--------------------------------------------------
+PHASE 4: FIRM-LEVEL ASYMMETRY SCORING
+Script: phase4_firm_level_asymmetry_signed.py
+Process:
+1. Signed Network Exposure: Calculates exposure preserving the sign of correlation.
+2. Shock Impact: computed as `signed_exposure` * `volatility`. 
+3. Asymmetry Score Calculation: 
+   - Score = (Avg Impact Positive Shocks) - (Avg Impact Negative Shocks)
+   - High positive score = Amplifier. Low/Negative score = Stabilizer.
+
+--------------------------------------------------
+PHASE 5: SECTOR & COMMUNITY AGGREGATION
+Scripts: build_company_sector.py, phase5_sector_level_asymmetry.py, phase5_network_communities.py
+Process:
+1. Sector Mapping: Uses NSE indices to group firms.
+2. Community Detection: Applies Louvain heuristics to identify highly dense sub-graphs.
+3. Macro Scoring: Averages Asymmetry Scores at the community level.
+
+5. MODEL ACCURACY & EVALUATION METRICS
+======================================
+Because dynamic financial networks are largely unsupervised (there is no "ground truth" target variable dictating a perfect network), "Accuracy" is defined by structural robustness, out-of-sample stability, and explanatory power:
+
+A. Structural Robustness (Network Metrics):
+- Edge Stability: By requiring a minimum of 50 overlapping observations within a 60-day window, spurious correlations are minimized.
+- Threshold Sensitivity: The correlation cutoff (>= 0.3) ensures that only statistically significant relationships are modeled, reducing noise (false positives) in the adjacency matrix.
+
+B. Detection Accuracy (Community Detection):
+- Modularity Score: The Louvain algorithm's accuracy is measured by "Modularity" (-0.5 to 1.0) which quantifies the density of links inside communities compared to links between communities. A higher modularity score indicates an accurate, statistically distinct partitioning of the market.
+- Sector Alignment Overlay: The algorithmically detected communities can be assessed for accuracy by cross-referencing them against actual NSE sector indices (e.g., overlapping mapped IT firms with Louvain Community 1).
+
+C. Predictive & Analytical Evaluation:
+- Asymmetry Score Validity: The efficacy of the Asymmetry Score is validated by backtesting how highly-ranked "Amplifiers" perform during historical market crashes. If the model accurately identifies systemic risk, shorting Top Amplifiers during a 5% negative shock index scenario should mathematically outperform shorting Top Stabilizers.
+
+6. EXTENSIBILITY AND FUTURE WORK
+================================
+- Graph Neural Networks (GNNs): The generated CSV outputs serve as engineered feature matrices and adjacency tensors for predictive deep learning models.
+- Eventual Goal: Forecast cascading portfolio failures before they occur based on asymmetric network states.
